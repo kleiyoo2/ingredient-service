@@ -1,7 +1,7 @@
 # Use the official Python base image
 FROM python:3.12-slim-bullseye
 
-# Install system dependencies, including the MS ODBC Driver
+# Install system dependencies and Microsoft ODBC driver
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -19,31 +19,22 @@ RUN apt-get update && apt-get install -y \
     && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
     && curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql17
 
-# --- FIX: CONFIGURE THE DYNAMIC LINKER ---
-# Add the ODBC driver's library path to the system's library search paths
-# and update the linker cache. This is crucial for the system to find the .so file at runtime.
-RUN echo "/opt/microsoft/msodbcsql17/lib64" > /etc/ld.so.conf.d/mssql-driver.conf \
-    && ldconfig
-# ----------------------------------------
+# Configure dynamic linker with correct path
+RUN echo "/opt/microsoft/msodbcsql17/lib" > /etc/ld.so.conf.d/mssql-driver.conf && ldconfig
 
-# Create the ODBC driver configuration file directly.
-RUN printf "[ODBC Driver 17 for SQL Server]\nDescription=Microsoft ODBC Driver 17 for SQL Server\nDriver=/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.so\n" > /etc/odbcinst.ini
+# Set up ODBC driver configuration
+RUN printf "[ODBC Driver 17 for SQL Server]\nDescription=Microsoft ODBC Driver 17 for SQL Server\nDriver=/opt/microsoft/msodbcsql17/lib/libmsodbcsql-17.so\n" > /etc/odbcinst.ini
 
-# --- DIAGNOSTIC COMMANDS ---
-# We will now check the state of the system and print it to the build log.
-RUN echo "--- Verifying driver file location ---" \
-    && ls -l /opt/microsoft/msodbcsql17/lib64/ \
-    && echo "--- Verifying odbcinst.ini content ---" \
-    && cat /etc/odbcinst.ini \
-    && echo "--- Querying installed ODBC drivers ---" \
-    && odbcinst -q -d \
-    && echo "--- Diagnostics Complete ---"
-# -----------------------------
+# Diagnostic (optional – remove in production)
+RUN echo "--- Checking actual driver path ---" \
+    && find / -name "libmsodbcsql-17.so" || echo "Driver not found"
 
-# Set up the application environment
+# Clean APT cache (after everything to avoid removing needed files)
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set up app environment
 WORKDIR /app
 
 # Copy and install Python dependencies
@@ -51,11 +42,11 @@ COPY requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Copy the rest of the application code
+# Copy app code
 COPY . .
 
-# Expose the port your app will run on inside the container
+# Expose app port
 EXPOSE 10000
 
-# The command to run your app. Render will use the command from its UI.
+# Run app using Gunicorn + Uvicorn
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:10000"]
