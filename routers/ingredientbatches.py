@@ -9,12 +9,12 @@ import logging
 
 # configure logging
 logger = logging.getLogger(__name__)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="http://localhost:4000/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="https://bleu-ums.onrender.com/auth/token")
 router = APIRouter(prefix="/ingredient-batches", tags=["ingredient batches"])
 
 # auth validation
 async def validate_token_and_roles(token: str, allowed_roles: List[str]):
-    USER_SERVICE_ME_URL = "http://localhost:4000/auth/users/me"
+    USER_SERVICE_ME_URL = "https://bleu-ums.onrender.com/auth/users/me"
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(USER_SERVICE_ME_URL, headers={"Authorization": f"Bearer {token}"})

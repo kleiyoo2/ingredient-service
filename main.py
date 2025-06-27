@@ -18,18 +18,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         # IMS
-        "http://localhost:3000",  # ims frontend
-        "http://192.168.100.10:3000",  # ims frontend (local network)
-        "http://127.0.0.1:4000",  # auth service
-        "http://localhost:4000",  
+        "https://bleu-ims.vercel.app",  # ims frontend  # ims frontend (local network)
+        "https://bleu-ums.onrender.com",  # auth service
 
         # POS
-        "http://localhost:9000",  # frontend
-        "http://192.168.100.10:9000",  
+        "https://bleu-pos-eight.vercel.app",  # frontend
 
         # OOS
-        "http://localhost:5000",  # frontend
-        "http://192.168.100.10:5000",  
+        "https://bleu-oos.vercel.app",  # frontend
     ],
     allow_credentials=True,
     allow_methods=["*"],

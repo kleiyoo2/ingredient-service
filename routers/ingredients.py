@@ -9,7 +9,7 @@ import logging
 
 # config
 logger = logging.getLogger(__name__)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="http://localhost:4000/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="https://bleu-ums.onrender.com/auth/token")
 router = APIRouter(prefix="/ingredients", tags=["ingredients"])
 
 # helper functions
