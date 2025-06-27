@@ -19,6 +19,7 @@ app.add_middleware(
     allow_origins=[
         # IMS
         "https://bleu-ims.vercel.app",  # ims frontend  # ims frontend (local network)
+        
         "https://bleu-ums.onrender.com",  # auth service
 
         # POS
