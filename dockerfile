@@ -1,7 +1,7 @@
-# Use official slim Python image
+# Use the official Python base image
 FROM python:3.12-slim-bullseye
 
-# Step 1: Install system & build dependencies, and ODBC support
+# Install system dependencies, including the MS ODBC Driver
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -19,37 +19,30 @@ RUN apt-get update && apt-get install -y \
     && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
     && curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y msodbcsql17
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Step 2: Find the real path of libmsodbcsql-17.so
-RUN echo "--- 🔍 Searching for libmsodbcsql-17.so ---" \
-    && find / -name "libmsodbcsql-17.so" > /driver_path.txt || echo "Driver not found" \
-    && cat /driver_path.txt
+# Create the ODBC driver configuration file. This is still good practice.
+RUN printf "[ODBC Driver 17 for SQL Server]\nDescription=Microsoft ODBC Driver 17 for SQL Server\nDriver=libmsodbcsql-17.so\n" > /etc/odbcinst.ini
 
-# Step 3: Set the correct dynamic linker path based on find result (assuming lib64)
-RUN echo "/opt/microsoft/msodbcsql17/lib64" > /etc/ld.so.conf.d/mssql-driver.conf && ldconfig
+# --- THIS IS THE DEFINITIVE FIX ---
+# Set the environment variable to tell the system's linker where to find the driver library.
+ENV LD_LIBRARY_PATH /opt/microsoft/msodbcsql17/lib64
+# -----------------------------------
 
-# Step 4: Write ODBC config to point to the driver
-RUN printf "[ODBC Driver 17 for SQL Server]\nDescription=Microsoft ODBC Driver 17 for SQL Server\nDriver=/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.so\n" > /etc/odbcinst.ini
-
-# Step 5: Debug installed drivers and paths
-RUN echo "--- ✅ ODBC Driver Check ---" \
-    && cat /etc/odbcinst.ini \
-    && echo "--- ✅ ldconfig -p | grep msodbc ---" \
-    && ldconfig -p | grep msodbc || echo "Driver not found in ld cache" \
-    && echo "--- ✅ odbcinst -q -d ---" \
-    && odbcinst -q -d
-
-# Step 6: Set working directory and install app dependencies
+# Set up the application environment
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Step 7: Copy all source files
+# Copy and install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+# Copy the rest of the application code
 COPY . .
 
-# Step 8: Expose the port (change if needed)
+# Expose the port your app will run on inside the container
 EXPOSE 10000
 
-# Step 9: Run FastAPI using Gunicorn + Uvicorn worker
+# The command to run your app. Render will use the command from its UI, but this is a good default.
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:10000"]
