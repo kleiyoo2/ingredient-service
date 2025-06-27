@@ -1,7 +1,7 @@
 import aioodbc
 
 # database config
-server = 'retailauth.c3wegea8y1ra.ap-southeast-2.rds.amazonaws.com  '
+server = 'retailauth.c3wegea8y1ra.ap-southeast-2.rds.amazonaws.com'
 database = 'bleuIMS'
 username = 'bleuadmin'
 password = 'Bleuauth123'
