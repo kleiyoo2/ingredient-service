@@ -22,6 +22,13 @@ RUN apt-get update && apt-get install -y \
     && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# --- FIX: CONFIGURE THE DYNAMIC LINKER ---
+# Add the ODBC driver's library path to the system's library search paths
+# and update the linker cache. This is crucial for the system to find the .so file at runtime.
+RUN echo "/opt/microsoft/msodbcsql17/lib64" > /etc/ld.so.conf.d/mssql-driver.conf \
+    && ldconfig
+# ----------------------------------------
+
 # Create the ODBC driver configuration file directly.
 RUN printf "[ODBC Driver 17 for SQL Server]\nDescription=Microsoft ODBC Driver 17 for SQL Server\nDriver=/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.so\n" > /etc/odbcinst.ini
 
