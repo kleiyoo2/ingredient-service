@@ -1,7 +1,7 @@
-# Use the official Python base image
+# Use official slim Python image
 FROM python:3.12-slim-bullseye
 
-# Install system dependencies and Microsoft ODBC driver
+# Step 1: Install system & build dependencies, and ODBC support
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -21,32 +21,35 @@ RUN apt-get update && apt-get install -y \
     && apt-get update \
     && ACCEPT_EULA=Y apt-get install -y msodbcsql17
 
-# Configure dynamic linker with correct path
-RUN echo "/opt/microsoft/msodbcsql17/lib" > /etc/ld.so.conf.d/mssql-driver.conf && ldconfig
+# Step 2: Find the real path of libmsodbcsql-17.so
+RUN echo "--- 🔍 Searching for libmsodbcsql-17.so ---" \
+    && find / -name "libmsodbcsql-17.so" > /driver_path.txt || echo "Driver not found" \
+    && cat /driver_path.txt
 
-# Set up ODBC driver configuration
-RUN printf "[ODBC Driver 17 for SQL Server]\nDescription=Microsoft ODBC Driver 17 for SQL Server\nDriver=/opt/microsoft/msodbcsql17/lib/libmsodbcsql-17.so\n" > /etc/odbcinst.ini
+# Step 3: Set the correct dynamic linker path based on find result (assuming lib64)
+RUN echo "/opt/microsoft/msodbcsql17/lib64" > /etc/ld.so.conf.d/mssql-driver.conf && ldconfig
 
-# Diagnostic (optional – remove in production)
-RUN echo "--- Checking actual driver path ---" \
-    && find / -name "libmsodbcsql-17.so" || echo "Driver not found"
+# Step 4: Write ODBC config to point to the driver
+RUN printf "[ODBC Driver 17 for SQL Server]\nDescription=Microsoft ODBC Driver 17 for SQL Server\nDriver=/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.so\n" > /etc/odbcinst.ini
 
-# Clean APT cache (after everything to avoid removing needed files)
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# Step 5: Debug installed drivers and paths
+RUN echo "--- ✅ ODBC Driver Check ---" \
+    && cat /etc/odbcinst.ini \
+    && echo "--- ✅ ldconfig -p | grep msodbc ---" \
+    && ldconfig -p | grep msodbc || echo "Driver not found in ld cache" \
+    && echo "--- ✅ odbcinst -q -d ---" \
+    && odbcinst -q -d
 
-# Set up app environment
+# Step 6: Set working directory and install app dependencies
 WORKDIR /app
-
-# Copy and install Python dependencies
 COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy app code
+# Step 7: Copy all source files
 COPY . .
 
-# Expose app port
+# Step 8: Expose the port (change if needed)
 EXPOSE 10000
 
-# Run app using Gunicorn + Uvicorn
+# Step 9: Run FastAPI using Gunicorn + Uvicorn worker
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:10000"]
